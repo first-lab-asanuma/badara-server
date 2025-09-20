@@ -3,13 +3,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# --- 임시 인메모리 데이터베이스 ---
-# 예약 정보
-# 0 == 一般診療・定期健診
-reservation_db = [
-    # {"id": 1, "patient_id": 1, "phone": "090-1234-5678", "date": "2025-09-15", "time": "10:00", "treatmentContent": "0"}
-]
-
 # 예약 가능 시간 및 휴일 정보 (reservation.json에서 가져옴)
 available_slots_data = {
   "available_slots": {
@@ -51,48 +44,27 @@ available_slots_data = {
   ]
 }
 
-# 사용자 정보 (로그인용)
-# 비밀번호 'qwer1234'에 대한 해시 값입니다.
-users_db = {
-    "asanuma": {
-        "id": 1,
-        "line_id": "asanuma_line",
-        "username": "asanuma",
-        "email": "asanuma@example.com",
-        "hashed_password": "$2b$12$Zw4szVz/6iO4DFDENKD1suKZYtxbgjLFReh09FTTlZHWzIlNWtdQ6",
-        "disabled": False,
-        "role": "system_admin",
-        "first_name": None,
-        "last_name": None,
-        "phone": None
-    },
-    "patient01": {
-        "id": 2,
-        "line_id": "test_line_id",
-        "username": "patient01",
-        "email": None,
-        "hashed_password": None,
-        "disabled": False,
-        "role": "patient",
-        "first_name": "田中",
-        "last_name": "太郎",
-        "phone": "090-1234-5678"
-    }
-}
-
-# db 통합 (기존 구조 호환성 및 확장성)
-db = {
-    "users": users_db,
-    "reservation": reservation_db,
-    "available_slots_data": available_slots_data
-}
-
 # --- 실제 데이터베이스 설정 (환경 변수 사용) ---
 engine = None
 SessionLocal = None
 Base = declarative_base()
 
 if os.environ.get("USE_REAL_DB") == "true":
-    SQLALCHEMY_DATABASE_URL = "mysql+mysqlconnector://root@localhost:3306/badara"
+    DB_USER = os.environ.get("DB_USER", "root")
+    DB_PASSWORD = os.environ.get("DB_PASSWORD", "0000")
+    DB_HOST = os.environ.get("DB_HOST", "localhost")
+    DB_PORT = os.environ.get("DB_PORT", "3306")
+    DB_NAME = os.environ.get("DB_NAME", "badara")
+    SQLALCHEMY_DATABASE_URL = f"mysql+mysqlconnector://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     engine = create_engine(SQLALCHEMY_DATABASE_URL)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Dependency to get a DB session
+def get_db():
+    if SessionLocal is None:
+        raise Exception("Database is not configured. Set USE_REAL_DB=true.")
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

@@ -1,0 +1,18 @@
+version: "3.9"
+
+services:
+  badara-db:
+#    platform: linux/x86_64       #Mac M1以上の場合は コメントを外して実施
+    container_name: badara-db
+    image: mysql:8.0.28
+    volumes:
+      - ./data:/var/lib/mysql
+      - ./badara.ddl:/docker-entrypoint-initdb.d/badara.ddl
+#      - ./db/ddl/saiso.sql:/docker-entrypoint-initdb.d/saiso.sql
+    ports:
+      - "3306:3306"
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: "0000"
+      MYSQL_DATABASE: "badara_dev"
+#    command: ["--init-file", "/docker-entrypoint-initdb.d/saiso.sql"]

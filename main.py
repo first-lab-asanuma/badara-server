@@ -2,8 +2,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import patientRouter, reservationRouter, authRouter
 from dotenv import load_dotenv
+import importlib
+import db.database # Import db.database first
 
 load_dotenv()
+
+# Force reload db.database to ensure latest changes are picked up
+importlib.reload(db.database)
 
 app = FastAPI()
 
