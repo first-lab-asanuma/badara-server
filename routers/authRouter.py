@@ -3,10 +3,10 @@ from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
 from sqlalchemy.orm import Session
 
-import authManager
+from auth import authManager
 from db.database import get_db
-from models.models import TUser
-from schemas.schemas import Token, User, UserUpdate, LineLoginRequest
+from entities.entities import TUser
+from schemas import Token, User, UserUpdate, LineLoginRequest
 
 router = APIRouter()
 
@@ -22,10 +22,11 @@ async def login_for_access_token_line(request: LineLoginRequest, db: Session = D
         )
     access_token_expires = timedelta(minutes=authManager.TOKEN_ACCESS_EXPIRE_MINUTES)
     access_token = authManager.create_access_token(
-        data={"sub": user.login_id}, # Use login_id for JWT subject
+        user=user,
         expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
+
 
 
 @router.post("/token", response_model=Token)
@@ -41,7 +42,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         )
     access_token_expires = timedelta(minutes=authManager.TOKEN_ACCESS_EXPIRE_MINUTES)
     access_token = authManager.create_access_token(
-        data={"sub": user.login_id}, # Use login_id for JWT subject
+        user=user,
         expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
@@ -58,10 +59,6 @@ async def update_users_me(user_update: UserUpdate, db: Session = Depends(get_db)
     
     for key, value in update_data.items():
         setattr(current_user, key, value)
-    
-    db.add(current_user)
-    db.commit()
-    db.refresh(current_user)
     
     return current_user
 

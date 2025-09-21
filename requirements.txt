@@ -1,8 +1,8 @@
 fastapi
 uvicorn[standard]
 python-jose[cryptography]
-passlib[bcrypt]
-bcrypt
+passlib
+bcrypt==4.0.1
 python-multipart
 SQLAlchemy
 mysql-connector-python

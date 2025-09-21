@@ -1,9 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import patientRouter, reservationRouter, authRouter
+from routers import patientRouter, reservationRouter, authRouter, hospitalRouter
 from dotenv import load_dotenv
 import importlib
 import db.database # Import db.database first
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -29,6 +34,7 @@ app.add_middleware(
 app.include_router(authRouter.router)
 app.include_router(patientRouter.router)
 app.include_router(reservationRouter.router)
+app.include_router(hospitalRouter.router)
 
 @app.get("/")
 def read_root():
