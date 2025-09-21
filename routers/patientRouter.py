@@ -4,7 +4,7 @@ from typing import List
 
 from auth import authManager
 from db.database import get_db
-from entities.entities import TUser
+from entities.entities import TUser, THospital
 from schemas import User, PatientCreate, UserUpdate, UserType
 
 router = APIRouter()
@@ -13,16 +13,14 @@ router = APIRouter()
 async def create_patient_user(user: PatientCreate, db: Session = Depends(get_db)):
     """새로운 환자(user_type="0") 사용자를 등록합니다."""
     # 동일한 login_id를 가진 사용자가 있는지 확인
-    db_user = authManager.get_user(db, login_id=user.login_id)
-    if db_user:
-        raise HTTPException(status_code=400, detail="Login ID already registered")
+    # db_user = authManager.get_user(db, login_id=user.login_id)
+    # if db_user:
+    #     raise HTTPException(status_code=400, detail="Login ID already registered")
 
-    # 새 TUser 객체 생성
-    # 참고: hospital_id=1 로 하드코딩 되어있습니다. 
-    # 추후 이 부분은 인증된 사용자의 병원 ID를 사용하는 등 적절한 방식으로 처리해야 합니다.
+    hospital = db.query(THospital).filter(THospital.hospital_code == user.hospital_code, THospital.deleted_flag == False).first()
     new_user = TUser(
-        **user.model_dump(),
-        hospital_id=1 # Placeholder
+        **user.model_dump(exclude={'hospital_code'}),
+        hospital_id=hospital.id
     )
     
     db.add(new_user)

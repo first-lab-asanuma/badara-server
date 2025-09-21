@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, DateTime, Time, Text, Boolean, func
+from sqlalchemy import Column, Integer, String, Date, DateTime, Time, Text, Boolean, func, LargeBinary
 from db.database import Base
 
 class THoliday(Base):
@@ -49,13 +49,14 @@ class TUser(Base):
 class THospital(Base):
     __tablename__ = 't_hospital'
     id = Column(Integer, primary_key=True, autoincrement=True, comment='病院ID')
+    hospital_code = Column(String(255), nullable=False, unique=True, comment='病院公開コード')
     name = Column(String(255), nullable=False, comment='病院名')
     website = Column(String(255), comment='病院HP_URL')
-    postal_code = Column(String(20), comment='郵便番号')
-    address = Column(String(255), comment='住所')
-    phone = Column(String(20), comment='連絡先')
+    postal_code = Column(String(20), nullable=False, comment='郵便番号')
+    address = Column(String(255), nullable=False, comment='住所')
+    phone = Column(String(20), nullable=False, comment='連絡先')
     fax = Column(String(20), comment='fax')
-    line_qr_code = Column(String(255), comment='LINEQRコード')
+    line_qr_code = Column(LargeBinary, nullable=False, comment='LINEQRコード')
     reservation_policy_header = Column(Text, comment='予約ポリシーヘッダー')
     reservation_policy_body = Column(Text, comment='予約ポリシーボディー')
     treatment = Column(Text, comment='治療内容')

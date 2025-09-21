@@ -49,6 +49,7 @@ class UserCreate(UserBase):
 
 class PatientCreate(UserCreate):
     user_type: UserType = UserType.PATIENT
+    hospital_code: Optional[str]
 
 class HospitalAdminCreate(UserCreate):
     user_type: UserType = UserType.HOSPITAL_ADMIN

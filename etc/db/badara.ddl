@@ -1,5 +1,5 @@
 -- Project Name : noname
--- Date/Time    : 2025/09/21 2:15:08
+-- Date/Time    : 2025/09/22 1:17:58
 -- Author       : admin
 -- RDBMS Type   : MySQL
 -- Application  : A5:SQL Mk-2
@@ -69,13 +69,14 @@ DROP TABLE if exists t_hospital CASCADE;
 
 CREATE TABLE t_hospital (
   id int auto_increment NOT NULL COMMENT '病院ID'
+  , hospital_code varchar(255) NOT NULL unique COMMENT '病院公開コード'
   , name varchar(255) NOT NULL COMMENT '病院名'
   , website varchar(255) COMMENT '病院HP_URL'
-  , postal_code varchar(20) COMMENT '郵便番号'
-  , address varchar(255) COMMENT '住所'
-  , phone varchar(20) COMMENT '連絡先'
+  , postal_code varchar(20) NOT NULL COMMENT '郵便番号'
+  , address varchar(255) NOT NULL COMMENT '住所'
+  , phone varchar(20) NOT NULL COMMENT '連絡先'
   , fax varchar(20) COMMENT 'fax'
-  , line_qr_code varchar(255) COMMENT 'LINEQRコード'
+  , line_qr_code MEDIUMBLOB NOT NULL COMMENT 'LINEQRコード'
   , reservation_policy_header text COMMENT '予約ポリシーヘッダー'
   , reservation_policy_body text COMMENT '予約ポリシーボディー'
   , treatment text COMMENT '治療内容'
