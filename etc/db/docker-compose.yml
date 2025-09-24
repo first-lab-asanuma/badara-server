@@ -8,11 +8,9 @@ services:
     volumes:
       - ./data:/var/lib/mysql
       - ./badara.ddl:/docker-entrypoint-initdb.d/badara.ddl
-#      - ./db/ddl/saiso.sql:/docker-entrypoint-initdb.d/saiso.sql
     ports:
       - "3306:3306"
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: "0000"
       MYSQL_DATABASE: "badara_dev"
-#    command: ["--init-file", "/docker-entrypoint-initdb.d/saiso.sql"]

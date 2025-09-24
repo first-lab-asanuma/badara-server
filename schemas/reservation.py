@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 from datetime import date, time
+from .user import User
 
 class ReservationBase(BaseModel):
     reservation_date: date
@@ -15,3 +16,6 @@ class Reservation(ReservationBase):
 
     class Config:
         orm_mode = True
+
+class ReservationWithPatient(Reservation):
+    patient: User

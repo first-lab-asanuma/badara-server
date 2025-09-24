@@ -3,12 +3,12 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from auth import authManager
 from db.database import get_db, available_slots_data
 from entities.entities import TReservation, TUser
-from schemas import Reservation, ReservationCreate, UserType
+from schemas import Reservation, ReservationCreate, UserType, ReservationWithPatient
 
 router = APIRouter()
 
@@ -70,9 +70,9 @@ async def get_my_reservations(
     """현재 로그인한 사용자의 예약 정보를 반환합니다."""
     now = datetime.now()
     reservation = db.query(TReservation).filter(
-        TReservation.user_id == current_user.id,
+        TReservation.hospital_id == current_user.hospital_id,
         TReservation.deleted_flag == False,
-        TReservation.cancel_date == None,
+        TReservation.cancel_date is None,
         func.concat(TReservation.reservation_date, ' ', TReservation.reservation_time) > now.strftime('%Y-%m-%d %H:%M:%S')
     ).order_by(
         TReservation.reservation_date.desc(),
@@ -80,7 +80,7 @@ async def get_my_reservations(
     ).first()
     return reservation
 
-@router.get("/api/reservations", response_model=List[Reservation])
+@router.get("/api/reservations", response_model=List[ReservationWithPatient])
 async def get_reservations(
     db: Session = Depends(get_db),
     current_user: TUser = Depends(authManager.get_current_active_user)
@@ -89,7 +89,7 @@ async def get_reservations(
     if current_user.user_type not in [UserType.HOSPITAL_ADMIN, UserType.SYSTEM_ADMIN]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to view all reservations")
     
-    reservations = db.query(TReservation).filter(TReservation.deleted_flag == False).all()
+    reservations = db.query(TReservation).options(joinedload(TReservation.patient)).filter(TReservation.deleted_flag == False).all()
     return reservations
 
 @router.get("/api/reservations/{reservation_id}", response_model=Reservation)

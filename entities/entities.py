@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Date, DateTime, Time, Text, Boolean, func, LargeBinary
+from sqlalchemy import Column, Integer, String, Date, DateTime, Time, Text, Boolean, func, LargeBinary, ForeignKey
+from sqlalchemy.orm import relationship
 from db.database import Base
 
 class THoliday(Base):
@@ -15,7 +16,7 @@ class THoliday(Base):
 class TReservation(Base):
     __tablename__ = 't_reservation'
     id = Column(Integer, primary_key=True, autoincrement=True, comment='予約id')
-    user_id = Column(Integer, nullable=False, comment='ユーザーID')
+    user_id = Column(Integer, ForeignKey('t_user.id'), nullable=False, comment='ユーザーID')
     hospital_id = Column(Integer, nullable=False, comment='病院ID')
     reservation_date = Column(Date, nullable=False, comment='予約日')
     reservation_time = Column(Time, nullable=False, comment='予約時間')
@@ -26,6 +27,8 @@ class TReservation(Base):
     created_by = Column(String(255), comment='作成者')
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment='更新日')
     updated_by = Column(String(255), comment='更新者')
+
+    patient = relationship("TUser")
 
 class TUser(Base):
     __tablename__ = 't_user'
