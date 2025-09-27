@@ -32,7 +32,6 @@ async def create_patient_user(user: PatientCreate, db: Session = Depends(get_db)
 @router.put("/api/users/patient/{user_id}", response_model=User)
 async def update_patient_info(user_id: int, user_update: UserUpdate, db: Session = Depends(get_db), current_user: TUser = Depends(authManager.get_current_active_user)):
     """ID로 환자(user_type="0") 사용자 정보를 업데이트합니다. (인증 필요)"""
-    # user_type '1'이 병원 관리자라고 가정합니다.
     if current_user.user_type not in [UserType.HOSPITAL_ADMIN, UserType.SYSTEM_ADMIN]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to update patient information")
 
@@ -40,6 +39,10 @@ async def update_patient_info(user_id: int, user_update: UserUpdate, db: Session
 
     if not user_to_update:
         raise HTTPException(status_code=404, detail="Patient user not found")
+
+    # 병원 관리자는 자기 병원 소속의 환자 정보만 수정 가능
+    if current_user.user_type == UserType.HOSPITAL_ADMIN and user_to_update.hospital_id != current_user.hospital_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to update this patient's information")
 
     update_data = user_update.model_dump(exclude_unset=True)
     for key, value in update_data.items():

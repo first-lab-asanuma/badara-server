@@ -7,6 +7,8 @@ class ReservationBase(BaseModel):
     reservation_date: date
     reservation_time: time
     treatment: Optional[str] = None
+    cancel_date: Optional[date] = None
+    deleted_flag: bool = False
 
 class ReservationCreate(ReservationBase):
     pass
