@@ -49,7 +49,7 @@ LName=定休日
 Comment=
 TableInnerOption=
 TableOption=
-Page=Main
+Page=MAIN
 Left=400
 Top=750
 Field="定休日ID","id","int auto_increment","NOT NULL",0,"","",$FFFFFFFF,""
@@ -65,7 +65,7 @@ Tag=定休日
 Color=$000000
 BkColor=$FFFFFF
 ModifiedDateTime=20250921021340
-Position="Main",400,750
+Position="MAIN",400,750
 ZOrder=-1
 
 [Entity]
@@ -74,7 +74,7 @@ LName=病院
 Comment=病院情報
 TableInnerOption=
 TableOption=
-Page=Main
+Page=MAIN
 Left=850
 Top=100
 Field="病院ID","id","int auto_increment","NOT NULL",0,"","",$FFFFFFFF,""
@@ -99,7 +99,7 @@ Tag=病院
 Color=$000000
 BkColor=$FFFFFF
 ModifiedDateTime=20250922003846
-Position="Main",850,100
+Position="MAIN",850,100
 ZOrder=-2
 
 [Entity]
@@ -108,7 +108,7 @@ LName=予約
 Comment=
 TableInnerOption=
 TableOption=
-Page=Main
+Page=MAIN
 Left=1600
 Top=700
 Field="予約id","id","int auto_increment","NOT NULL",0,"","",$FFFFFFFF,""
@@ -129,7 +129,7 @@ Tag=予約
 Color=$000000
 BkColor=$FFFFFF
 ModifiedDateTime=20250921021345
-Position="Main",1600,700
+Position="MAIN",1600,700
 ZOrder=-3
 
 [Entity]
@@ -138,7 +138,7 @@ LName=ユーザー
 Comment=
 TableInnerOption=
 TableOption=
-Page=Main
+Page=MAIN
 Left=1900
 Top=150
 Field="ユーザーID","id","int auto_increment","NOT NULL",0,"","",$FFFFFFFF,""
@@ -162,7 +162,7 @@ Tag=ユーザー
 Color=$000000
 BkColor=$FFFFFF
 ModifiedDateTime=20250922011641
-Position="Main",1900,150
+Position="MAIN",1900,150
 ZOrder=-4
 
 [Relation]

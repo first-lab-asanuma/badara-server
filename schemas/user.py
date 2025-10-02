@@ -68,3 +68,4 @@ class UserUpdate(BaseModel):
     last_name: Optional[str] = None
     first_name: Optional[str] = None
     contact: Optional[str] = None
+    medical_record_no: Optional[str] = None

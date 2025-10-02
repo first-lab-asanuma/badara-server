@@ -30,6 +30,8 @@ async def get_available_slots(
     - 이미 예약된 시간은 제외됩니다.
     """
     today = date.today()
+    now = datetime.now()
+    three_hours_later = now + timedelta(hours=3)
     date_range = [today + timedelta(days=i) for i in range(15)]
     
     # 1. Get holidays for the hospital
@@ -61,6 +63,12 @@ async def get_available_slots(
             day_booked_slots = booked_slots.get(day, set())
             available_day_slots = sorted(list(all_slots - day_booked_slots))
             
+            if day == today:
+                available_day_slots = [
+                    slot for slot in available_day_slots
+                    if datetime.strptime(f"{day_str} {slot}", "%Y-%m-%d %H:%M") > three_hours_later
+                ]
+
             # Only add the day to the output if there is at least one available slot
             if available_day_slots:
                 available_slots[day_str] = available_day_slots
@@ -80,24 +88,25 @@ async def create_reservation(
     # if reservation.reservation_date.strftime("%Y-%m-%d") in holidays:
     #     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot make a reservation on a holiday.")
 
-    # 요청된 시간 슬롯이 사용 가능한지 확인
-    date_str = reservation.reservation_date.strftime("%Y-%m-%d")
-    time_str = reservation.reservation_time.strftime("%H:%M")
-    
-    if date_str not in available_slots_data["available_slots"] or \
-       time_str not in available_slots_data["available_slots"][date_str]:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Requested time slot is not available.")
-
-    # 동일한 사용자가 동일한 시간에 이미 예약했는지 확인
-    existing_reservation = db.query(TReservation).filter(
-        TReservation.user_id == current_user.id,
-        TReservation.reservation_date == reservation.reservation_date,
-        TReservation.reservation_time == reservation.reservation_time,
-        TReservation.deleted_flag == False # 활성 예약만 고려
+    # Check if the reservation date is a holiday
+    is_holiday = db.query(THoliday).filter(
+        THoliday.hospital_id == current_user.hospital_id,
+        THoliday.holiday_date == reservation.reservation_date
     ).first()
 
-    if existing_reservation:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You already have a reservation at this time.")
+    if is_holiday:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot make a reservation on a holiday.")
+
+    # Check if the requested time slot is already booked by anyone
+    is_slot_booked = db.query(TReservation).filter(
+        TReservation.hospital_id == current_user.hospital_id,
+        TReservation.reservation_date == reservation.reservation_date,
+        TReservation.reservation_time == reservation.reservation_time,
+        TReservation.deleted_flag == False
+    ).first()
+
+    if is_slot_booked:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Requested time slot is not available.")
 
     # 새 예약 생성
     new_reservation = TReservation(
