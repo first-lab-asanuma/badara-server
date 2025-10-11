@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from auth import authManager
 from db.database import get_db
 from entities.entities import TUser
+from enums.user_type import UserType
 from schemas import Token, User, UserUpdate, LineLoginRequest
 
 router = APIRouter()
@@ -63,9 +64,22 @@ async def update_users_me(user_update: UserUpdate, db: Session = Depends(get_db)
     return current_user
 
 @router.get("/api/token/verify", status_code=status.HTTP_200_OK)
-async def verify_token(current_user: TUser = Depends(authManager.get_current_user)):
+async def verify_patient_token(current_user: TUser = Depends(authManager.get_current_user)):
     """
-    Verifies the validity of the access token.
-    Returns a success response if the token is valid, otherwise a 401 error.
+    Verifies the validity of the access token for a patient user.
+    Returns a success response if the token is valid and the user is a patient, otherwise a 403 error.
     """
+    if current_user.user_type != UserType.PATIENT:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is not a patient")
+    return {"valid": True}
+
+
+@router.get("/api/token/verify/hospital", status_code=status.HTTP_200_OK)
+async def verify_hospital_token(current_user: TUser = Depends(authManager.get_current_user)):
+    """
+    Verifies the validity of the access token for a hospital admin user.
+    Returns a success response if the token is valid and the user is a hospital admin, otherwise a 403 error.
+    """
+    if current_user.user_type not in [UserType.HOSPITAL_ADMIN, UserType.SYSTEM_ADMIN]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is not a hospital admin or system admin")
     return {"valid": True}

@@ -1,13 +1,14 @@
 from typing import Optional
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
 from sqlalchemy.orm import Session
 
 from auth import authManager
 from db.database import get_db
-from entities.entities import THospital, TUser
+from entities.entities import THospital, TUser, THoliday
 from enums.user_type import UserType
-from schemas import Hospital
+from schemas.hospital import Hospital, Holiday, HolidayCreate
 
 router = APIRouter()
 
@@ -93,3 +94,77 @@ async def update_my_hospital_info(
     db.refresh(hospital_to_update)
 
     return hospital_to_update
+
+
+@router.get("/api/hospitals/me/holidays", response_model=list[Holiday])
+async def get_my_hospital_holidays(
+    target_date: date,
+    db: Session = Depends(get_db),
+    current_user: TUser = Depends(authManager.get_current_active_user)
+):
+    """
+    現在ログインしているユーザーの病院の休日を取得します。
+    """
+    start_date = target_date - timedelta(days=10)
+    end_date = target_date + timedelta(days=10)
+
+    holidays = db.query(THoliday).filter(
+        THoliday.hospital_id == current_user.hospital_id,
+        THoliday.holiday_date >= start_date,
+        THoliday.holiday_date <= end_date,
+        THoliday.deleted_flag == False
+    ).all()
+    return holidays
+
+
+@router.post("/api/hospitals/me/holidays", response_model=Holiday)
+async def create_my_hospital_holiday(
+    holiday_data: HolidayCreate,
+    db: Session = Depends(get_db),
+    current_user: TUser = Depends(authManager.get_current_active_user)
+):
+    """
+    現在ログインしているユーザーの病院の休日を追加します。
+    """
+    if current_user.user_type not in [UserType.HOSPITAL_ADMIN, UserType.SYSTEM_ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to add holiday"
+        )
+
+    new_holiday = THoliday(
+        hospital_id=current_user.hospital_id,
+        holiday_date=holiday_data.holiday_date,
+        created_by=current_user.email,
+        updated_by=current_user.email
+    )
+    db.add(new_holiday)
+    db.commit()
+    db.refresh(new_holiday)
+    return new_holiday
+
+
+@router.delete("/api/hospitals/me/holidays/{holiday_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_my_hospital_holiday(
+    holiday_id: int,
+    db: Session = Depends(get_db),
+    current_user: TUser = Depends(authManager.get_current_active_user)
+):
+    """
+    現在ログインしているユーザーの病院の休日を削除します。
+    """
+    if current_user.user_type not in [UserType.HOSPITAL_ADMIN, UserType.SYSTEM_ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to delete holiday"
+        )
+
+    holiday_to_delete = db.query(THoliday).filter(THoliday.id == holiday_id, THoliday.hospital_id == current_user.hospital_id).first()
+
+    if not holiday_to_delete:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Holiday not found")
+
+    holiday_to_delete.deleted_flag = True
+    db.commit()
+
+    return

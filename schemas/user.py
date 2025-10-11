@@ -1,6 +1,7 @@
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, model_validator, field_validator
 from typing import Optional, Any
 from enums.user_type import UserType
+from utils import hashid_manager
 
 class UserBase(BaseModel):
     email: str | None = None
@@ -56,9 +57,16 @@ class HospitalAdminCreate(UserCreate):
     password: str
 
 class User(UserBase):
-    id: int
-    hospital_id: int
+    id: str
+    hospital_id: str
     medical_record_no: Optional[str] = None
+
+    @field_validator('id', 'hospital_id', mode='before')
+    @classmethod
+    def encode_id(cls, v: Any) -> str:
+        if isinstance(v, int):
+            return hashid_manager.encode_id(v)
+        return v
 
     class Config:
         orm_mode = True

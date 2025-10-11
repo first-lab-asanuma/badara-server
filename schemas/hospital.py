@@ -1,7 +1,10 @@
 import base64
-from typing import Optional
+from typing import Optional, Any
+from datetime import date
 
 from pydantic import BaseModel, field_validator
+
+from utils import hashid_manager
 
 
 class HospitalBase(BaseModel):
@@ -18,13 +21,37 @@ class HospitalBase(BaseModel):
     treatment: Optional[str] = None
 
 
-class Hospital(HospitalBase):
+class Holiday(BaseModel):
     id: int
+    holiday_date: date
+    
+    class Config:
+        orm_mode = True
+
+
+class HolidayCreate(BaseModel):
+    holiday_date: date
+
+
+class HolidayDelete(BaseModel):
+    id: int
+
+class Hospital(HospitalBase):
+    id: str
+
+    @field_validator('id', mode='before')
+    @classmethod
+    def encode_id(cls, v: Any) -> str:
+        if isinstance(v, int):
+            return hashid_manager.encode_id(v)
+        return v
 
     @field_validator('line_qr_code', mode='before')
     @classmethod
-    def convert_bytes_to_base64(cls, v: bytes) -> str:
-        return base64.b64encode(v).decode('utf-8')
+    def convert_bytes_to_base64(cls, v: Any) -> str:
+        if isinstance(v, bytes):
+            return base64.b64encode(v).decode('utf-8')
+        return v
 
     class Config:
         orm_mode = True

@@ -1,16 +1,15 @@
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from datetime import datetime, timedelta, timezone
-from typing import Optional
 from sqlalchemy.orm import Session
 
+from db.database import get_db
 # Import new models, schemas, and db dependency
 from entities.entities import TUser
-from schemas import TokenData
-from db.database import get_db
-from enums.user_type import UserType
 
 # --- Constants ---
 TOKEN_SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"

@@ -6,9 +6,10 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from auth import authManager
-from db.database import get_db, available_slots_data
+from db.database import get_db
 from entities.entities import TReservation, TUser, THoliday
-from schemas import Reservation, ReservationCreate, UserType, ReservationWithPatient
+from schemas import Reservation, ReservationCreate, UserType, ReservationWithPatient, ReservationCreateForAdmin
+from utils import hashid_manager
 
 router = APIRouter()
 
@@ -84,10 +85,6 @@ async def create_reservation(
     """새로운 예약을 생성합니다."""
     # user_id와 hospital_id는 토큰에서 가져오므로, 요청 본문에서 제거
 
-    # 요청된 날짜가 휴일인지 확인
-    # if reservation.reservation_date.strftime("%Y-%m-%d") in holidays:
-    #     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot make a reservation on a holiday.")
-
     # Check if the reservation date is a holiday
     is_holiday = db.query(THoliday).filter(
         THoliday.hospital_id == current_user.hospital_id,
@@ -119,6 +116,62 @@ async def create_reservation(
     db.refresh(new_reservation)
     return new_reservation
 
+@router.post("/api/reservations/admin", response_model=Reservation, status_code=status.HTTP_201_CREATED)
+async def create_reservation_for_patient_by_admin(
+    reservation: ReservationCreateForAdmin,
+    db: Session = Depends(get_db),
+    current_user: TUser = Depends(authManager.get_current_active_user)
+):
+    """병원 관리자가 환자의 medical_record_no를 사용하여 새로운 예약을 생성합니다."""
+    # 1. 관리자 권한 확인
+    if current_user.user_type not in [UserType.HOSPITAL_ADMIN, UserType.SYSTEM_ADMIN]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+
+    # 2. 관리자 병원 내에서 medical_record_no로 환자 찾기
+    patient_to_reserve = db.query(TUser).filter(
+        TUser.hospital_id == current_user.hospital_id,
+        TUser.medical_record_no == reservation.medical_record_no,
+        TUser.user_type == UserType.PATIENT,
+        TUser.deleted_flag == False
+    ).first()
+
+    if not patient_to_reserve:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Patient with medical record number '{reservation.medical_record_no}' not found in this hospital.")
+
+    # 3. 휴일 확인 (create_reservation과 동일)
+    is_holiday = db.query(THoliday).filter(
+        THoliday.hospital_id == current_user.hospital_id,
+        THoliday.holiday_date == reservation.reservation_date
+    ).first()
+
+    if is_holiday:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot make a reservation on a holiday.")
+
+    # 4. 예약된 시간 슬롯 확인 (관리자 예약은 동일 시간에 2개까지 허용)
+    booked_slots_count = db.query(TReservation).filter(
+        TReservation.hospital_id == current_user.hospital_id,
+        TReservation.reservation_date == reservation.reservation_date,
+        TReservation.reservation_time == reservation.reservation_time,
+        TReservation.deleted_flag == False
+    ).count()
+
+    if booked_slots_count >= 2:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Requested time slot is fully booked (2 reservations already exist).")
+
+    # 5. 새 예약 생성
+    new_reservation = TReservation(
+        user_id=patient_to_reserve.id,
+        hospital_id=current_user.hospital_id,
+        reservation_date=reservation.reservation_date,
+        reservation_time=reservation.reservation_time,
+        treatment=reservation.treatment
+    )
+    db.add(new_reservation)
+    db.flush()
+    db.refresh(new_reservation)
+
+    return new_reservation
+
 @router.get("/api/me/reservations", response_model=Optional[Reservation])
 async def get_my_reservations(
     db: Session = Depends(get_db),
@@ -138,6 +191,8 @@ async def get_my_reservations(
 
 @router.get("/api/reservations", response_model=List[ReservationWithPatient])
 async def get_reservations(
+    from_date: date = Query(..., description="조회 시작일 (YYYY-MM-DD)"),
+    to_date: date = Query(..., description="조회 종료일 (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
     current_user: TUser = Depends(authManager.get_current_active_user)
 ):
@@ -146,6 +201,11 @@ async def get_reservations(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to view all reservations")
     
     query = db.query(TReservation).options(joinedload(TReservation.patient)).filter(TReservation.deleted_flag == False)
+    
+    if from_date:
+        query = query.filter(TReservation.reservation_date >= from_date)
+    if to_date:
+        query = query.filter(TReservation.reservation_date <= to_date)
     
     if current_user.user_type == UserType.HOSPITAL_ADMIN:
         query = query.filter(TReservation.hospital_id == current_user.hospital_id)
@@ -181,13 +241,17 @@ async def get_hospital_reservations(
     
     return reservations
 
-@router.get("/api/reservations/{reservation_id}", response_model=Reservation)
+@router.get("/api/reservations/{reservation_hash_id}", response_model=Reservation)
 async def get_reservation_by_id(
-    reservation_id: int,
+    reservation_hash_id: str,
     db: Session = Depends(get_db),
     current_user: TUser = Depends(authManager.get_current_active_user)
 ):
     """ID로 특정 예약 정보를 조회합니다."""
+    reservation_id = hashid_manager.decode_id(reservation_hash_id)
+    if reservation_id is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reservation not found")
+
     reservation = db.query(TReservation).filter(TReservation.id == reservation_id, TReservation.deleted_flag == False).first()
     if not reservation:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reservation not found")
@@ -205,13 +269,17 @@ async def get_reservation_by_id(
         
     return reservation
 
-@router.delete("/api/reservations/{reservation_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/api/reservations/{reservation_hash_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def cancel_reservation(
-    reservation_id: int,
+    reservation_hash_id: str,
     db: Session = Depends(get_db),
     current_user: TUser = Depends(authManager.get_current_active_user)
 ):
     """ID로 예약을 취소합니다."""
+    reservation_id = hashid_manager.decode_id(reservation_hash_id)
+    if reservation_id is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reservation not found")
+
     reservation = db.query(TReservation).filter(TReservation.id == reservation_id, TReservation.deleted_flag == False).first()
     if not reservation:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reservation not found")

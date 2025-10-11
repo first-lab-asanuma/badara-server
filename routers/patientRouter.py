@@ -6,6 +6,7 @@ from auth import authManager
 from db.database import get_db
 from entities.entities import TUser, THospital
 from schemas import User, PatientCreate, UserUpdate, UserType
+from utils import hashid_manager
 
 router = APIRouter()
 
@@ -27,9 +28,13 @@ async def create_patient_user(user: PatientCreate, db: Session = Depends(get_db)
     
     return new_user
 
-@router.put("/api/users/patient/{user_id}", response_model=User)
-async def update_patient_info(user_id: int, user_update: UserUpdate, db: Session = Depends(get_db), current_user: TUser = Depends(authManager.get_current_active_user)):
+@router.put("/api/users/patient/{user_hash_id}", response_model=User)
+async def update_patient_info(user_hash_id: str, user_update: UserUpdate, db: Session = Depends(get_db), current_user: TUser = Depends(authManager.get_current_active_user)):
     """ID로 환자(user_type="0") 사용자 정보를 업데이트합니다. (인증 필요)"""
+    user_id = hashid_manager.decode_id(user_hash_id)
+    if user_id is None:
+        raise HTTPException(status_code=404, detail="Patient user not found")
+
     if current_user.user_type not in [UserType.HOSPITAL_ADMIN, UserType.SYSTEM_ADMIN]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to update patient information")
 
@@ -62,9 +67,32 @@ async def update_patient_info(user_id: int, user_update: UserUpdate, db: Session
     
     return user_to_update
 
-@router.get("/api/hospitals/{hospital_id}/patients", response_model=List[User])
+
+@router.get("/api/users/patient/{user_hash_id}", response_model=User)
+async def get_patient_by_id(user_hash_id: str, db: Session = Depends(get_db), current_user: TUser = Depends(authManager.get_current_active_user)):
+    """ID로 환자(user_type=\"0\") 사용자 정보를 조회합니다. (인증 필요)"""
+    user_id = hashid_manager.decode_id(user_hash_id)
+    if user_id is None:
+        raise HTTPException(status_code=404, detail="Patient user not found")
+
+    if current_user.user_type not in [UserType.HOSPITAL_ADMIN, UserType.SYSTEM_ADMIN]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to view patient information")
+
+    patient = db.query(TUser).filter(TUser.id == user_id, TUser.user_type == UserType.PATIENT).first()
+
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient user not found")
+
+    # 병원 관리자는 자기 병원 소속의 환자 정보만 조회 가능
+    if current_user.user_type == UserType.HOSPITAL_ADMIN and patient.hospital_id != current_user.hospital_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to view this patient's information")
+
+    return patient
+
+
+@router.get("/api/hospitals/{hospital_hash_id}/patients", response_model=List[User])
 async def get_hospital_patients(
-    hospital_id: int,
+    hospital_hash_id: str,
     db: Session = Depends(get_db),
     current_user: TUser = Depends(authManager.get_current_active_user)
 ):
@@ -73,6 +101,10 @@ async def get_hospital_patients(
     시스템 관리자는 모든 병원의 환자를 조회할 수 있으며,
     병원 관리자는 자신이 속한 병원의 환자만 조회할 수 있습니다.
     """
+    hospital_id = hashid_manager.decode_id(hospital_hash_id)
+    if hospital_id is None:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
     # 권한 확인
     if current_user.user_type == UserType.HOSPITAL_ADMIN:
         if current_user.hospital_id != hospital_id:
@@ -119,4 +151,4 @@ async def get_my_hospital_patients(
 @router.get("/api/me/id")
 async def get_my_id(current_user: TUser = Depends(authManager.get_current_user)):
     """로그인한 사용자의 ID를 반환합니다. (토큰 인증 필요)"""
-    return {"id": current_user.id}
+    return {"id": hashid_manager.encode_id(current_user.id)}

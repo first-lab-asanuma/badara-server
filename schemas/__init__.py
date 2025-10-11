@@ -1,5 +1,5 @@
 from .line import LineLoginRequest
-from .reservation import Reservation, ReservationBase, ReservationCreate, ReservationWithPatient
+from .reservation import Reservation, ReservationBase, ReservationCreate, ReservationWithPatient, ReservationCreateForAdmin
 from .token import Token, TokenData
 from .user import User, UserBase, UserCreate, UserUpdate, PatientCreate, HospitalAdminCreate
 from .hospital import Hospital
@@ -11,6 +11,7 @@ __all__ = [
     "ReservationBase",
     "ReservationCreate",
     "ReservationWithPatient",
+    "ReservationCreateForAdmin",
     "Token",
     "TokenData",
     "User",
