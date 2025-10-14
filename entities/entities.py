@@ -43,6 +43,7 @@ class TUser(Base):
     last_name = Column(String(50), comment='名前（姓）')
     first_name = Column(String(50), comment='名前（名）')
     contact = Column(String(50), comment='連絡先')
+    last_reserve_date = Column(DateTime, comment='直近予約日')
     deleted_flag = Column(Boolean, default=False, comment='削除フラグ')
     created_at = Column(DateTime, default=func.now(), comment='作成日')
     created_by = Column(String(255), comment='作成者')

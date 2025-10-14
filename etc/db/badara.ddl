@@ -1,5 +1,5 @@
 -- Project Name : noname
--- Date/Time    : 2025/09/22 1:17:58
+-- Date/Time    : 2025/10/15 0:54:15
 -- Author       : admin
 -- RDBMS Type   : MySQL
 -- Application  : A5:SQL Mk-2
@@ -56,6 +56,7 @@ CREATE TABLE t_user (
   , last_name varchar(50) COMMENT '名前（姓）'
   , first_name varchar(50) COMMENT '名前（名）'
   , contact varchar(50) COMMENT '連絡先'
+  , last_reserve_date datetime COMMENT '直近予約日'
   , deleted_flag tinyint(1) DEFAULT 0 COMMENT '削除フラグ'
   , created_at datetime DEFAULT CURRENT_TIMESTAMP COMMENT '作成日'
   , created_by varchar(255) COMMENT '作成者'

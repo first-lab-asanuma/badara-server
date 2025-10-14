@@ -90,41 +90,8 @@ async def get_patient_by_id(user_hash_id: str, db: Session = Depends(get_db), cu
     return patient
 
 
-@router.get("/api/hospitals/{hospital_hash_id}/patients", response_model=List[User])
-async def get_hospital_patients(
-    hospital_hash_id: str,
-    db: Session = Depends(get_db),
-    current_user: TUser = Depends(authManager.get_current_active_user)
-):
-    """
-    특정 병원의 환자 목록을 조회합니다.
-    시스템 관리자는 모든 병원의 환자를 조회할 수 있으며,
-    병원 관리자는 자신이 속한 병원의 환자만 조회할 수 있습니다.
-    """
-    hospital_id = hashid_manager.decode_id(hospital_hash_id)
-    if hospital_id is None:
-        raise HTTPException(status_code=404, detail="Hospital not found")
 
-    # 권한 확인
-    if current_user.user_type == UserType.HOSPITAL_ADMIN:
-        if current_user.hospital_id != hospital_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to view patients of other hospitals"
-            )
-    elif current_user.user_type != UserType.SYSTEM_ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to view patient lists"
-        )
 
-    patients = db.query(TUser).filter(
-        TUser.hospital_id == hospital_id,
-        TUser.user_type == UserType.PATIENT,
-        TUser.deleted_flag == False
-    ).order_by(TUser.last_name, TUser.first_name).all()
-
-    return patients
 
 @router.get("/api/me/patients", response_model=List[User])
 async def get_my_hospital_patients(

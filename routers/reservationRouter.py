@@ -111,9 +111,17 @@ async def create_reservation(
         user_id=current_user.id,
         hospital_id=current_user.hospital_id
     )
-    db.add(new_reservation);
+    db.add(new_reservation)
     db.flush()
     db.refresh(new_reservation)
+
+    # Update last_reserve_date for the current user
+    combined_datetime = datetime.combine(new_reservation.reservation_date, new_reservation.reservation_time)
+    current_user.last_reserve_date = combined_datetime
+    db.add(current_user)
+    db.flush()
+    db.refresh(current_user)
+
     return new_reservation
 
 @router.post("/api/reservations/admin", response_model=Reservation, status_code=status.HTTP_201_CREATED)
@@ -169,6 +177,13 @@ async def create_reservation_for_patient_by_admin(
     db.add(new_reservation)
     db.flush()
     db.refresh(new_reservation)
+
+    # Update last_reserve_date for the patient
+    combined_datetime = datetime.combine(new_reservation.reservation_date, new_reservation.reservation_time)
+    patient_to_reserve.last_reserve_date = combined_datetime
+    db.add(patient_to_reserve)
+    db.flush()
+    db.refresh(patient_to_reserve)
 
     return new_reservation
 
