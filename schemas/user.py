@@ -1,7 +1,9 @@
 from pydantic import BaseModel, model_validator, field_validator
 from typing import Optional, Any
 from enums.user_type import UserType
+from schemas import Reservation
 from utils import hashid_manager
+from typing import List
 
 class UserBase(BaseModel):
     email: str | None = None
@@ -69,7 +71,7 @@ class User(UserBase):
         return v
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class UserUpdate(BaseModel):
     email: Optional[str] = None
@@ -77,3 +79,6 @@ class UserUpdate(BaseModel):
     first_name: Optional[str] = None
     contact: Optional[str] = None
     medical_record_no: Optional[str] = None
+
+class PatientWithReservations(User):
+    reservations: List['Reservation'] = []

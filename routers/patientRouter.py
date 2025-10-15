@@ -4,8 +4,8 @@ from typing import List
 
 from auth import authManager
 from db.database import get_db
-from entities.entities import TUser, THospital
-from schemas import User, PatientCreate, UserUpdate, UserType
+from entities.entities import TUser, THospital, TReservation
+from schemas import User, PatientCreate, UserUpdate, UserType, PatientWithReservations
 from utils import hashid_manager
 
 router = APIRouter()
@@ -68,7 +68,7 @@ async def update_patient_info(user_hash_id: str, user_update: UserUpdate, db: Se
     return user_to_update
 
 
-@router.get("/api/users/patient/{user_hash_id}", response_model=User)
+@router.get("/api/users/patient/{user_hash_id}", response_model=PatientWithReservations)
 async def get_patient_by_id(user_hash_id: str, db: Session = Depends(get_db), current_user: TUser = Depends(authManager.get_current_active_user)):
     """ID로 환자(user_type=\"0\") 사용자 정보를 조회합니다. (인증 필요)"""
     user_id = hashid_manager.decode_id(user_hash_id)
@@ -87,7 +87,12 @@ async def get_patient_by_id(user_hash_id: str, db: Session = Depends(get_db), cu
     if current_user.user_type == UserType.HOSPITAL_ADMIN and patient.hospital_id != current_user.hospital_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to view this patient's information")
 
-    return patient
+    reservations = db.query(TReservation).filter(TReservation.user_id == user_id).order_by(TReservation.reservation_date.desc(), TReservation.reservation_time.desc()).limit(10).all()
+
+    patient_with_reservations = PatientWithReservations.model_validate(patient)
+    patient_with_reservations.reservations = reservations
+
+    return patient_with_reservations
 
 
 

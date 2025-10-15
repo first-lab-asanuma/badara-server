@@ -1,7 +1,6 @@
 from pydantic import BaseModel, field_validator
 from typing import Optional, Any
 from datetime import date, time
-from .user import User
 from utils import hashid_manager
 
 class ReservationBase(BaseModel):
@@ -29,7 +28,7 @@ class Reservation(ReservationBase):
         return v
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class ReservationWithPatient(Reservation):
-    patient: User
+    patient: 'User'

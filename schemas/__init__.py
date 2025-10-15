@@ -1,7 +1,7 @@
 from .line import LineLoginRequest
 from .reservation import Reservation, ReservationBase, ReservationCreate, ReservationWithPatient, ReservationCreateForAdmin
 from .token import Token, TokenData
-from .user import User, UserBase, UserCreate, UserUpdate, PatientCreate, HospitalAdminCreate
+from .user import User, UserBase, UserCreate, UserUpdate, PatientCreate, HospitalAdminCreate, PatientWithReservations
 from .hospital import Hospital
 from enums.user_type import UserType
 
@@ -22,4 +22,8 @@ __all__ = [
     "HospitalAdminCreate",
     "Hospital",
     "UserType",
+    "PatientWithReservations",
 ]
+
+PatientWithReservations.model_rebuild()
+ReservationWithPatient.model_rebuild()
