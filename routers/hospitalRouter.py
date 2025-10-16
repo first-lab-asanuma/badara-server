@@ -1,9 +1,11 @@
+import base64
 from typing import Optional
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form, Body
 from sqlalchemy.orm import Session
 
+import schemas
 from auth import authManager
 from db.database import get_db
 from entities.entities import THospital, TUser, THoliday
@@ -38,20 +40,11 @@ async def get_my_hospital_info(
     
     return hospital
 
-@router.put("/api/hospitals/me", response_model=Hospital)
+@router.patch("/api/hospitals/me", response_model=Hospital)
 async def update_my_hospital_info(
+    hospital_info: schemas.hospital.HospitalUpdate = Body(...),
     db: Session = Depends(get_db),
-    current_user: TUser = Depends(authManager.get_current_active_user),
-    name: Optional[str] = Form(None),
-    website: Optional[str] = Form(None),
-    postal_code: Optional[str] = Form(None),
-    address: Optional[str] = Form(None),
-    phone: Optional[str] = Form(None),
-    fax: Optional[str] = Form(None),
-    reservation_policy_header: Optional[str] = Form(None),
-    reservation_policy_body: Optional[str] = Form(None),
-    treatment: Optional[str] = Form(None),
-    line_qr_code: Optional[UploadFile] = File(None)
+    current_user: TUser = Depends(authManager.get_current_active_user)
 ):
     """
     현재 로그인한 사용자의 병원 정보를 업데이트합니다. (multipart/form-data)
@@ -68,27 +61,22 @@ async def update_my_hospital_info(
     if not hospital_to_update:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hospital not found")
 
-    update_data = {
-        "name": name,
-        "website": website,
-        "postal_code": postal_code,
-        "address": address,
-        "phone": phone,
-        "fax": fax,
-        "reservation_policy_header": reservation_policy_header,
-        "reservation_policy_body": reservation_policy_body,
-        "treatment": treatment,
-    }
-
-    # Filter out fields that were not provided (are None)
-    update_data = {k: v for k, v in update_data.items() if v is not None}
-
-    if line_qr_code:
-        qr_code_bytes = await line_qr_code.read()
-        update_data["line_qr_code"] = qr_code_bytes
+    update_data = hospital_info.model_dump(exclude_unset=True)
 
     for key, value in update_data.items():
-        setattr(hospital_to_update, key, value)
+        if key == "line_qr_code" and value is not None:
+            # Decode base64 string to bytes
+            # Assuming the base64 string might include a data URI prefix like "data:image/png;base64,"
+            if isinstance(value, str) and "base64," in value:
+                header, base64_data = value.split("base64,", 1)
+                decoded_value = base64.b64decode(base64_data)
+            elif isinstance(value, str):
+                decoded_value = base64.b64decode(value)
+            else:
+                decoded_value = value # Should not happen if validation is correct
+            setattr(hospital_to_update, key, decoded_value)
+        else:
+            setattr(hospital_to_update, key, value)
 
     db.commit()
     db.refresh(hospital_to_update)
