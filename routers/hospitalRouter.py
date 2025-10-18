@@ -75,6 +75,15 @@ async def update_my_hospital_info(
             else:
                 decoded_value = value # Should not happen if validation is correct
             setattr(hospital_to_update, key, decoded_value)
+        elif key == "treatment" and value is not None:
+            # 리스트로 들어온 치료 항목을 검증하고 콤마로 join하여 DB에 저장
+            if not isinstance(value, list):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="treatment must be a list")
+            trimmed = [str(item).strip() for item in value]
+            if len(trimmed) == 0 or any(s == '' for s in trimmed):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="treatment items cannot be empty")
+            joined = ",".join(trimmed)
+            setattr(hospital_to_update, key, joined)
         else:
             setattr(hospital_to_update, key, value)
 

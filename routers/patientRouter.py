@@ -1,12 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
+from sqlalchemy import or_, and_, func
+from datetime import datetime, timedelta
 
 from auth import authManager
 from db.database import get_db
 from entities.entities import TUser, THospital, TReservation
-from schemas import User, PatientCreate, UserUpdate, UserType, PatientWithReservations
+from schemas import User, PatientCreate, UserUpdate, UserType, PatientWithReservations, PatientNameId, UserWithLastReserve, PatientListCursorResponse
 from utils import hashid_manager
+from utils import cursor as cursor_util
 
 router = APIRouter()
 
@@ -98,8 +101,10 @@ async def get_patient_by_id(user_hash_id: str, db: Session = Depends(get_db), cu
 
 
 
-@router.get("/api/me/patients", response_model=List[User])
+@router.get("/api/me/patients", response_model=PatientListCursorResponse)
 async def get_my_hospital_patients(
+    limit: int = Query(1000, ge=1, le=2000),
+    cursor: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: TUser = Depends(authManager.get_current_active_user)
 ):
@@ -112,13 +117,121 @@ async def get_my_hospital_patients(
             detail="Only hospital administrators can view their hospital's patient list"
         )
 
-    patients = db.query(TUser).filter(
+    base_query = db.query(TUser).filter(
         TUser.hospital_id == current_user.hospital_id,
         TUser.user_type == UserType.PATIENT,
         TUser.deleted_flag == False
-    ).order_by(TUser.last_name, TUser.first_name).all()
+    )
 
-    return patients
+    if cursor:
+        try:
+            cur = cursor_util.decode_cursor(cursor)
+            c_last = cur.get('last_name')
+            c_first = cur.get('first_name')
+            c_id = int(cur.get('id')) if cur.get('id') is not None else None
+            if c_last is None or c_first is None or c_id is None:
+                raise ValueError('invalid cursor parts')
+            base_query = base_query.filter(
+                or_(
+                    TUser.last_name > c_last,
+                    and_(TUser.last_name == c_last, TUser.first_name > c_first),
+                    and_(TUser.last_name == c_last, TUser.first_name == c_first, TUser.id > c_id)
+                )
+            )
+        except Exception:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="無効なカーソルです。")
+
+    patients = base_query.order_by(TUser.last_name, TUser.first_name, TUser.id).limit(limit + 1).all()
+
+    result = []
+    for p in patients:
+        res_date = None
+        if getattr(p, 'last_reserve_date', None) is not None:
+            # 날짜만 반환: YYYY-MM-DD
+            res_date = p.last_reserve_date.strftime('%Y-%m-%d %H:%M:%S')
+        item = UserWithLastReserve.model_validate(p).model_dump()
+        item.pop('email', None)
+        item.pop('login_id', None)
+        item['last_reserve_date'] = res_date
+        result.append(item)
+
+    hasnext = len(result) > limit
+    next_cursor = None
+    if hasnext:
+        result = result[:limit]
+        last = patients[limit - 1]
+        next_cursor = cursor_util.encode_cursor({
+            'last_name': last.last_name or '',
+            'first_name': last.first_name or '',
+            'id': last.id,
+        })
+
+    return {"patients": result, "hasnext": hasnext, "next_cursor": next_cursor}
+
+
+@router.get("/api/me/patients/mrn-unconfirmed", response_model=List[PatientNameId])
+async def list_mrn_unconfirmed_patients(
+    db: Session = Depends(get_db),
+    current_user: TUser = Depends(authManager.get_current_active_user)
+):
+    """
+    활성 환자 중 `medical_record_no`가 미확정(NULL 또는 빈 문자열)인 사용자 목록을
+    해당 환자의 `id`와 `name`만 포함하여 반환한다. 이름은 성+이름을 합친 문자열이다.
+    """
+    if current_user.user_type != UserType.HOSPITAL_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only hospital administrators can query this resource"
+        )
+
+    rows = (
+        db.query(TUser.id, TUser.last_name, TUser.first_name)
+        .filter(
+            TUser.hospital_id == current_user.hospital_id,
+            TUser.user_type == UserType.PATIENT,
+            TUser.deleted_flag == False,
+            or_(TUser.medical_record_no == None, TUser.medical_record_no == "")
+        )
+        .order_by(TUser.last_name, TUser.first_name)
+        .all()
+    )
+
+    return [
+        {
+            "id": hashid_manager.encode_id(r.id),
+            "name": f"{(r.last_name or '')}{(r.first_name or '')}",
+        }
+        for r in rows
+    ]
+
+
+@router.get("/api/me/patients/by-mrn/{medical_record_no}", response_model=User)
+async def get_patient_by_mrn(
+    medical_record_no: str,
+    db: Session = Depends(get_db),
+    current_user: TUser = Depends(authManager.get_current_active_user)
+):
+    """
+    병원 관리자가 자신의 병원에서 특정 `medical_record_no`로 환자 정보를 단건 조회한다.
+    """
+    if current_user.user_type != UserType.HOSPITAL_ADMIN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only hospital administrators can query this resource")
+
+    patient = db.query(TUser).filter(
+        TUser.hospital_id == current_user.hospital_id,
+        TUser.user_type == UserType.PATIENT,
+        TUser.deleted_flag == False,
+        TUser.medical_record_no == medical_record_no
+    ).first()
+
+    if not patient:
+        # i18n에서日本語に変換される（MRNは表示しない）
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Patient with medical record number '{medical_record_no}' not found in this hospital."
+        )
+
+    return patient
 
 @router.get("/api/me/id")
 async def get_my_id(current_user: TUser = Depends(authManager.get_current_user)):

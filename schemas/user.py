@@ -1,4 +1,5 @@
 from pydantic import BaseModel, model_validator, field_validator
+from datetime import datetime
 from typing import Optional, Any
 from enums.user_type import UserType
 from schemas import Reservation
@@ -82,3 +83,25 @@ class UserUpdate(BaseModel):
 
 class PatientWithReservations(User):
     reservations: List['Reservation'] = []
+
+
+class PatientNameId(BaseModel):
+    id: str
+    name: str
+
+
+class UserWithLastReserve(User):
+    last_reserve_date: Optional[str] = None
+
+    @field_validator('last_reserve_date', mode='before')
+    @classmethod
+    def format_last_reserve_date(cls, v: Any) -> Any:
+        if isinstance(v, datetime):
+            return v.strftime('%Y-%m-%d %H:%M:%S')
+        return v
+
+
+class PatientListCursorResponse(BaseModel):
+    patients: List[UserWithLastReserve]
+    next_cursor: Optional[str] = None
+    hasnext: bool = False
